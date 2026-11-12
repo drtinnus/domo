@@ -1,0 +1,13 @@
+{
+  "name": "domo-hub",
+  "version": "0.1.0",
+  "private": true,
+  "main": "server.js",
+  "engines": { "node": ">=18" },
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "@tuya/tuya-connector-nodejs": "^2.1.2",
+    "express": "^4.19.2",
+    "ring-client-api": "^14.0.0"
+  }
+}

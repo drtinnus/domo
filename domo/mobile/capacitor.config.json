@@ -1,0 +1,2 @@
+{ "appId": "com.you.domo", "appName": "Domo Hub", "webDir": "../public",
+  "server": { "androidScheme": "http", "cleartext": true } }

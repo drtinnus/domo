@@ -1,0 +1,12 @@
+#!/bin/sh
+PKG=/var/packages/domo
+APP=$PKG/target
+PIDF=$PKG/var/domo.pid
+NODE=$(command -v node || ls /var/packages/Node.js_v18/target/usr/local/bin/node)
+case "$1" in
+  start)  [ -f $PKG/var/config.json ] || cp $APP/config.example.json $PKG/var/config.json
+          cd $APP && nohup "$NODE" server.js >> $PKG/var/domo.log 2>&1 & echo $! > $PIDF ;;
+  stop)   [ -f $PIDF ] && kill "$(cat $PIDF)" && rm -f $PIDF ;;
+  status) [ -f $PIDF ] && kill -0 "$(cat $PIDF)" 2>/dev/null ;;
+esac
+exit 0

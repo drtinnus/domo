@@ -1,0 +1,8 @@
+{
+  "port": 8420,
+  "apiToken": "change-me-long-random-string",
+  "tuya":   { "baseUrl": "https://openapi.tuyaeu.com", "accessKey": "", "secretKey": "", "uid": "" },
+  "ring":   { "refreshToken": "" },
+  "foscam": [ { "id": "foscam-garden", "name": "Garden", "host": "192.168.1.50", "port": 88, "user": "admin", "pass": "" } ],
+  "google": { "enabled": false, "clientId": "", "clientSecret": "" }
+}

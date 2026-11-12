@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest"><title>Domo Hub</title>
+<style>
+:root{--bg:#f3f1ec;--panel:#fff;--ink:#1d1c19;--mute:#6d6a62;--line:#dedad0;--lit:#e8a317;--litink:#2a1d00}
+@media(prefers-color-scheme:dark){:root{--bg:#1b1a17;--panel:#262420;--ink:#efece4;--mute:#9b978c;--line:#38352f}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 ui-rounded,"Avenir Next",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:960px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.6rem;margin:8px 0 4px}h2{font-size:1.05rem;margin:28px 0 10px;color:var(--mute);font-weight:600}
+.sub{color:var(--mute);margin:0}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+.dev{border:1px solid var(--line);background:var(--panel);color:inherit;border-radius:14px;padding:14px;text-align:left;font:inherit;cursor:pointer;min-height:92px;display:flex;flex-direction:column;justify-content:space-between}
+.dev[aria-pressed=true]{background:var(--lit);border-color:var(--lit);color:var(--litink)}
+.dev small{color:inherit;opacity:.7}.dev:disabled{opacity:.45}
+.dev:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--lit);outline-offset:2px}
+.cams{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.cam{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel)}
+.cam img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000}
+.cam div{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;gap:8px}
+.pad button{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+form{display:grid;gap:10px;max-width:380px;margin-top:20px}
+input{padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit}
+.go{padding:12px;border-radius:10px;border:0;background:var(--lit);color:var(--litink);font:inherit;font-weight:700;cursor:pointer}
+#err{color:#c0392b;min-height:1.4em}
+</style></head><body><main>
+<h1>Home</h1><p class="sub" id="status">Loading</p><p id="err" role="alert"></p>
+<section id="setup" hidden>
+  <p>Connect to your Synology hub.</p>
+  <form id="f"><input id="u" placeholder="Hub address, e.g. http://192.168.1.10:8420" inputmode="url" required>
+  <input id="t" placeholder="API token" type="password" required><button class="go">Connect</button></form>
+</section>
+<section id="app" hidden><h2>Lights and switches</h2><div class="grid" id="devs"></div>
+<h2>Cameras</h2><div class="cams" id="cams"></div></section></main>
+<script>
+const $=s=>document.querySelector(s);
+let base=localStorage.getItem('hub')||(location.protocol.startsWith('http')&&!window.Capacitor?location.origin:'');
+let tok=localStorage.getItem('tok')||'';
+const hdr={Authorization:'Bearer '+tok,'Content-Type':'application/json'};
+async function api(p,o={}){const r=await fetch(base+'/api'+p,{...o,headers:hdr});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||'Error '+r.status);return r.json()}
+function el(t,props={},kids=[]){const e=Object.assign(document.createElement(t),props);kids.forEach(k=>e.append(k));return e}
+$('#f').onsubmit=e=>{e.preventDefault();localStorage.setItem('hub',$('#u').value.replace(/\/$/,''));localStorage.setItem('tok',$('#t').value);location.reload()};
+async function load(){
+  if(!tok||!base){$('#setup').hidden=false;$('#status').textContent='Not connected';return}
+  try{
+    const d=await api('/devices');$('#app').hidden=false;
+    const sw=d.filter(x=>x.type!=='camera'),cams=d.filter(x=>x.type==='camera');
+    $('#status').textContent=sw.length+' devices, '+cams.length+' cameras';
+    $('#devs').replaceChildren(...sw.map(x=>{
+      const b=el('button',{className:'dev',disabled:!x.online},[el('strong',{textContent:x.name}),el('small',{textContent:x.online?(x.on?'On':'Off'):'Offline'+' · '+x.provider})]);
+      b.setAttribute('aria-pressed',x.on);
+      b.onclick=async()=>{try{await api('/devices/'+encodeURIComponent(x.id)+'/command',{method:'POST',body:JSON.stringify({on:!x.on})});load()}catch(e){$('#err').textContent=e.message}};
+      return b}));
+    $('#cams').replaceChildren(...cams.map(c=>{
+      const img=el('img',{alt:c.name+' live view'});
+      const tick=()=>img.src=base+'/api/cameras/'+encodeURIComponent(c.id)+'/snapshot?token='+encodeURIComponent(tok)+'&t='+Date.now();
+      tick();setInterval(()=>{if(!document.hidden)tick()},3000);
+      const pad=el('span',{className:'pad'});
+      if(c.ptz)[['up','↑'],['left','←'],['right','→'],['down','↓']].forEach(([dir,ch])=>{
+        const b=el('button',{textContent:ch,title:'Move '+dir});b.onclick=()=>api('/cameras/'+encodeURIComponent(c.id)+'/ptz',{method:'POST',body:JSON.stringify({dir})});pad.append(b)});
+      return el('div',{className:'cam'},[img,el('div',{},[el('span',{textContent:c.name+' ('+c.provider+')'}),pad])])}));
+  }catch(e){$('#err').textContent=e.message+(e.message.includes('Invalid')?' Check the token.':'');$('#setup').hidden=false;$('#status').textContent='Cannot connect'}
+}
+load();setInterval(()=>{if(!document.hidden&&!$('#app').hidden)load()},20000);
+</script></body></html>
